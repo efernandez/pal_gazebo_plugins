@@ -16,7 +16,9 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES gazebo_ros_range
             gazebo_ros_forcetorque
+            gazebo_pal_bumper
             gazebo_pal_hand
+  CATKIN_DEPENDS pal_device_msgs
   DEPENDS gazebo
   )
 
@@ -29,12 +31,16 @@ target_link_libraries(gazebo_ros_range ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES} $
 add_library(gazebo_ros_forcetorque src/gazebo_ros_forcetorque.cpp)
 target_link_libraries(gazebo_ros_forcetorque ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES})
 
+add_library(gazebo_pal_bumper src/gazebo_pal_bumper.cpp)
+target_link_libraries(gazebo_pal_bumper ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES})
+
 add_library(gazebo_pal_hand src/gazebo_pal_hand.cpp)
 target_link_libraries(gazebo_pal_hand ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES})
 
 install(TARGETS
   gazebo_ros_range
   gazebo_ros_forcetorque
+  gazebo_pal_bumper
   gazebo_pal_hand
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
