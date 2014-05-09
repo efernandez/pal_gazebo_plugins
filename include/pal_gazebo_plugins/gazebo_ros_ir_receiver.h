@@ -73,42 +73,41 @@ public:
   virtual ~GazeboRosIRReceiver();
 
   /// \brief Load the controller
-  void Load(sensors::SensorPtr _sensor, sdf::ElementPtr _sdf);
+  void Load(sensors::SensorPtr sensor, sdf::ElementPtr sdf);
 
 private:
   /// \brief connected by updateConnection, called when contact
   void UpdateChild();
 
-  /// \brief ROS callback queue thread
-  void RosQueueThread();
+  /// \brief IR receiver callback queue thread
+  void IRReceiverQueueThread();
 
-  /// \brief: thread out Load function with
-  /// with anything that might be blocking.
-  void DeferredLoad();
+  /// \brief thread out Load function with anything that might be blocking
+  void LoadThread();
 
   /// \brief for setting ROS name space
   std::string robot_namespace_;
   std::string topic_name_;
   std::string frame_name_;
   double      update_rate_;
+  double      update_period_;
 
-  /// Pointer to the update event connections
+  /// \brief Pointer to the update event connections
   event::ConnectionPtr updateConnection;
 
-  // Contact sensors
-  /// \brief Pointer to the contact sensor
-  sensors::SensorPtr sensor;
-  ros::Publisher pub;
+  /// \brief Pointer to the sensor
+  sensors::SensorPtr sensor_;
+  ros::Publisher pub_;
 
-  boost::thread deferredLoadThread;
+  boost::thread deferred_load_thread_;
 
   // ROS stuff
-  ros::NodeHandle* rosNode;
-  ros::CallbackQueue rosQueue;
-  boost::thread callbackQueueThread;
+  ros::NodeHandle* nh_;
+  ros::CallbackQueue ir_receiver_queue_;
+  boost::thread callback_queue_thread_;
 
   // Controls stuff
-  ros::Time lastUpdateTime;
+  ros::Time last_update_time_;
 
   // Mutex
   boost::mutex mutex_;

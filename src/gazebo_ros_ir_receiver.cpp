@@ -36,114 +36,123 @@
 
 #include <pal_gazebo_plugins/gazebo_ros_ir_receiver.h>
 
+#include <string>
+
 #include <kobuki_msgs/DockInfraRed.h>
 
-#include <string>
+#include <tf/tf.h>
 
 namespace gazebo
 {
 GZ_REGISTER_SENSOR_PLUGIN(GazeboRosIRReceiver)
 
 GazeboRosIRReceiver::GazeboRosIRReceiver()
-  : SensorPlugin()
-  , rosNode()
 {}
 
 GazeboRosIRReceiver::~GazeboRosIRReceiver()
 {
-  event::Events::DisconnectWorldUpdateBegin(this->updateConnection);
-  this->rosNode->shutdown();
-  this->rosQueue.clear();
-  this->rosQueue.disable();
-  this->callbackQueueThread.join();
-  delete this->rosNode;
+  event::Events::DisconnectWorldUpdateBegin(updateConnection);
+
+  ir_receiver_queue_.clear();
+  ir_receiver_queue_.disable();
+  nh_->shutdown();
+  callback_queue_thread_.join();
+
+  delete nh_;
 }
 
-void GazeboRosIRReceiver::Load(sensors::SensorPtr _sensor,
-                                 sdf::ElementPtr _sdf)
+void GazeboRosIRReceiver::Load(
+    sensors::SensorPtr parent,
+    sdf::ElementPtr sdf)
 {
-  this->robot_namespace_ = "";
-  if (_sdf->HasElement("robotNamespace"))
-    this->robot_namespace_ =
-      _sdf->GetElement("robotNamespace")->Get<std::string>() + "/";
-
-  this->topic_name_ = "ir_receiver";
-  if (_sdf->GetElement("topicName"))
-    this->topic_name_ =
-      _sdf->GetElement("topicName")->Get<std::string>();
-
-  if (!_sdf->HasElement("frameName"))
-  {
-    ROS_INFO("IR reciever sensor plugin missing <frameName>, defaults to world");
-    this->frame_name_ = "world";
-  }
-  else
-    this->frame_name_ = _sdf->GetElement("frameName")->Get<std::string>();
-
-  this->update_rate_ = 100.0;
-  if (!_sdf->HasElement("updateRate"))
-  {
-    ROS_INFO("IR reciever sensor plugin missing <updateRate>, defaults to %f", this->update_rate_);
-  }
-  else
-    this->update_rate_ = _sdf->GetElement("updateRate")->Get<double>();
-
-  // Get sensor
-  this->sensor = _sensor;
-  if (!this->sensor)
-    gzerr << "sensor not found\n" << "\n";
-
-  // ros callback queue for processing subscription
-  this->deferredLoadThread = boost::thread(
-    boost::bind(&GazeboRosIRReceiver::DeferredLoad, this));
-}
-
-////////////////////////////////////////////////////////////////////////////////
-void GazeboRosIRReceiver::DeferredLoad()
-{
-  // initialize ros
+  // Make sure the ROS node for Gazebo has already been initialized
   if (!ros::isInitialized())
   {
-    gzerr << "Not loading plugin since ROS hasn't been "
-          << "properly initialized.  Try starting gazebo with ros plugin:\n"
-          << "  gazebo -s libgazebo_ros_api_plugin.so\n";
+    ROS_FATAL_STREAM("A ROS node for Gazebo has not been initialized, unable to load plugin. "
+      << "Load the Gazebo system plugin 'libgazebo_ros_api_plugin.so' in the gazebo_ros package)");
     return;
   }
 
-  this->pub =
-    this->rosNode->advertise<kobuki_msgs::DockInfraRed>("/" + this->robot_namespace_+ "/" + this->topic_name_, 10);
+  robot_namespace_ = "";
+  if (sdf->HasElement("robotNamespace"))
+    robot_namespace_ = sdf->GetElement("robotNamespace")->Get<std::string>() + "/";
 
-  // ros callback queue for processing subscription
-  this->callbackQueueThread = boost::thread(
-    boost::bind(&GazeboRosIRReceiver::RosQueueThread, this));
+  topic_name_ = "ir_receiver";
+  if (!sdf->GetElement("topicName"))
+    ROS_WARN_STREAM("IR receiver sensor plugin missing <topicName>, defaults to " << topic_name_);
+  else
+    topic_name_ = sdf->GetElement("topicName")->Get<std::string>();
+
+  frame_name_ = "world";
+  if (!sdf->HasElement("frameName"))
+    ROS_WARN_STREAM("IR reciever sensor plugin missing <frameName>, defaults to " << frame_name_);
+  else
+    frame_name_ = sdf->GetElement("frameName")->Get<std::string>();
+
+  update_rate_ = 100.0;
+  if (!sdf->HasElement("updateRate"))
+    ROS_WARN_STREAM("IR reciever sensor plugin missing <updateRate>, defaults to " << update_rate_);
+  else
+    update_rate_ = sdf->GetElement("updateRate")->Get<double>();
+
+  update_period_ = update_rate_ > 0.0 ? 1.0/update_rate_ : 0.0;
+
+  // Get sensor
+  sensor_ = parent;
+  if (!sensor_)
+    gzerr << "sensor not found\n" << "\n";
+
+  deferred_load_thread_ = boost::thread(
+    boost::bind(&GazeboRosIRReceiver::LoadThread, this));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+void GazeboRosIRReceiver::LoadThread()
+{
+  ROS_ERROR("GazeboRosIRReceiver::LoadThread");
+
+  nh_ = new ros::NodeHandle(robot_namespace_);
+  nh_->setCallbackQueue(&ir_receiver_queue_);
+
+  // resolve tf prefix
+  std::string prefix = "";
+  nh_->param("tf_prefix", prefix, prefix);
+  frame_name_ = tf::resolve(prefix, frame_name_);
+
+  pub_ = nh_->advertise<kobuki_msgs::DockInfraRed>(topic_name_, 10);
+
+  // start custum queue for IR receiver
+  callback_queue_thread_ = boost::thread(
+    boost::bind(&GazeboRosIRReceiver::IRReceiverQueueThread, this));
 
   // Connect to the sensor update event.
-  this->updateConnection = this->sensor->ConnectUpdated(
+  updateConnection = sensor_->ConnectUpdated(
               boost::bind(&GazeboRosIRReceiver::UpdateChild, this));
 
   // Make sure the parent sensor is active.
-  this->sensor->SetActive(true);
+  sensor_->SetActive(true);
 
-  this->lastUpdateTime = ros::Time::now();
+  last_update_time_ = ros::Time::now();
 }
 
 void GazeboRosIRReceiver::UpdateChild()
 {
-  if (this->pub.getNumSubscribers() <= 0)
+  ROS_ERROR("GazeboRosIRReceiver::UpdateChild");
+  if (pub_.getNumSubscribers() <= 0)
     return;
 
-  boost::mutex::scoped_lock sclock(this->mutex_);
+  boost::mutex::scoped_lock lock(mutex_);
 
-  static const ros::Duration update_period(1.0/this->update_rate_);
-
+  // @todo use common::Time as in gazebo_ros_range.cpp
   ros::Time now = ros::Time::now();
-  if (( now - this->lastUpdateTime) >= update_period)
+  if (( now - last_update_time_).toSec() >= update_period_)
   {
-    this->lastUpdateTime = now;
+    ROS_ERROR("Updating!!!");
+    last_update_time_ = now;
 
     // @todo logic for the IRs
     kobuki_msgs::DockInfraRed msg;
-    msg.header.frame_id = this->frame_name_;
+    msg.header.frame_id = frame_name_;
     msg.header.stamp = now;
 
     msg.data.clear();
@@ -151,17 +160,19 @@ void GazeboRosIRReceiver::UpdateChild()
     msg.data.push_back(2);
     msg.data.push_back(3);
 
-    this->pub.publish(msg);
+    pub_.publish(msg);
   }
 }
 
-void GazeboRosIRReceiver::RosQueueThread()
+void GazeboRosIRReceiver::IRReceiverQueueThread()
 {
-  ros::Rate rate(this->update_rate_);
+  ROS_ERROR("GazeboRosIRReceiver::RosQueueThread");
+  ros::Rate rate(update_rate_);
 
-  while (this->rosNode->ok())
+  while (nh_->ok())
   {
-    this->rosQueue.callAvailable();
+    ROS_ERROR("ir_receiver_queue_.callAvailable()");
+    ir_receiver_queue_.callAvailable();
     rate.sleep();
   }
 }
