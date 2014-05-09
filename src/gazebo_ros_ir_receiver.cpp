@@ -61,10 +61,11 @@ GazeboRosIRReceiver::~GazeboRosIRReceiver()
   delete nh_;
 }
 
-void GazeboRosIRReceiver::Load(
-    sensors::SensorPtr parent,
-    sdf::ElementPtr sdf)
+void GazeboRosIRReceiver::Load(sensors::SensorPtr parent, sdf::ElementPtr sdf)
 {
+  // @todo organize better, probably following:
+  // https://github.com/ros-simulation/gazebo_ros_pkgs/blob/hydro-devel/gazebo_plugins/src/gazebo_ros_block_laser.cpp
+
   // Make sure the ROS node for Gazebo has already been initialized
   if (!ros::isInitialized())
   {
@@ -96,6 +97,12 @@ void GazeboRosIRReceiver::Load(
     update_rate_ = sdf->GetElement("updateRate")->Get<double>();
 
   update_period_ = update_rate_ > 0.0 ? 1.0/update_rate_ : 0.0;
+
+  // Get the world name
+  const std::string world_name = parent->GetWorldName();
+  world_ = physics::get_world(world_name);
+
+  last_update_time_ = world_->GetSimTime();
 
   // Get sensor
   sensor_ = parent;
@@ -129,29 +136,26 @@ void GazeboRosIRReceiver::LoadThread()
 
   // Make sure the parent sensor is active.
   sensor_->SetActive(true);
-
-  last_update_time_ = ros::Time::now();
 }
 
 void GazeboRosIRReceiver::UpdateChild()
 {
-  ROS_ERROR_THROTTLE(1.0, "GazeboRosIRReceiver::UpdateChild");
   if (pub_.getNumSubscribers() <= 0)
     return;
 
   boost::mutex::scoped_lock lock(mutex_);
 
-  // @todo use common::Time as in gazebo_ros_range.cpp
-  ros::Time now = ros::Time::now();
-  if (( now - last_update_time_).toSec() >= update_period_)
+  common::Time now = world_->GetSimTime();
+  if (( now - last_update_time_) >= update_period_)
   {
-    ROS_ERROR_THROTTLE(1.0, "Updating!!!");
+    ROS_ERROR_THROTTLE(10.0, "IR Receiver logic not implemented yet!");
     last_update_time_ = now;
 
     // @todo logic for the IRs
     kobuki_msgs::DockInfraRed msg;
     msg.header.frame_id = frame_name_;
-    msg.header.stamp = now;
+    msg.header.stamp.sec = now.sec;
+    msg.header.stamp.nsec = now.nsec;
 
     msg.data.clear();
     msg.data.push_back(1);
@@ -168,7 +172,6 @@ void GazeboRosIRReceiver::IRReceiverQueueThread()
 
   while (nh_->ok())
   {
-    ROS_ERROR_THROTTLE(1.0, "ir_receiver_queue_.callAvailable()");
     ir_receiver_queue_.callAvailable();
     rate.sleep();
   }

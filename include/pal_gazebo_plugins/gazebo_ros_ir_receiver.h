@@ -106,8 +106,11 @@ private:
   ros::CallbackQueue ir_receiver_queue_;
   boost::thread callback_queue_thread_;
 
+  // Pointer to the world
+  physics::WorldPtr world_;
+
   // Controls stuff
-  ros::Time last_update_time_;
+  common::Time last_update_time_;
 
   // Mutex
   boost::mutex mutex_;
