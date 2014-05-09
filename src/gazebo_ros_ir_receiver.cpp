@@ -109,8 +109,6 @@ void GazeboRosIRReceiver::Load(
 ////////////////////////////////////////////////////////////////////////////////
 void GazeboRosIRReceiver::LoadThread()
 {
-  ROS_ERROR("GazeboRosIRReceiver::LoadThread");
-
   nh_ = new ros::NodeHandle(robot_namespace_);
   nh_->setCallbackQueue(&ir_receiver_queue_);
 
@@ -137,7 +135,7 @@ void GazeboRosIRReceiver::LoadThread()
 
 void GazeboRosIRReceiver::UpdateChild()
 {
-  ROS_ERROR("GazeboRosIRReceiver::UpdateChild");
+  ROS_ERROR_THROTTLE(1.0, "GazeboRosIRReceiver::UpdateChild");
   if (pub_.getNumSubscribers() <= 0)
     return;
 
@@ -147,7 +145,7 @@ void GazeboRosIRReceiver::UpdateChild()
   ros::Time now = ros::Time::now();
   if (( now - last_update_time_).toSec() >= update_period_)
   {
-    ROS_ERROR("Updating!!!");
+    ROS_ERROR_THROTTLE(1.0, "Updating!!!");
     last_update_time_ = now;
 
     // @todo logic for the IRs
@@ -166,12 +164,11 @@ void GazeboRosIRReceiver::UpdateChild()
 
 void GazeboRosIRReceiver::IRReceiverQueueThread()
 {
-  ROS_ERROR("GazeboRosIRReceiver::RosQueueThread");
   ros::Rate rate(update_rate_);
 
   while (nh_->ok())
   {
-    ROS_ERROR("ir_receiver_queue_.callAvailable()");
+    ROS_ERROR_THROTTLE(1.0, "ir_receiver_queue_.callAvailable()");
     ir_receiver_queue_.callAvailable();
     rate.sleep();
   }
