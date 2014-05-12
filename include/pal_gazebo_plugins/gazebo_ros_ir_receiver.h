@@ -61,6 +61,8 @@
 #include <gazebo/sensors/SensorTypes.hh>
 #include <gazebo/sensors/Sensor.hh>
 
+#include <pal_gazebo_plugins/ir_emitter.h>
+
 namespace gazebo
 {
 class GazeboRosIRReceiver : public SensorPlugin
@@ -114,6 +116,9 @@ private:
 
   // Mutex
   boost::mutex mutex_;
+
+  // IR emitters
+  std::vector<IREmitter> ir_emitters_;
 };
 }
 

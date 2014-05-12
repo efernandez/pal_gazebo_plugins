@@ -30,7 +30,7 @@ target_link_libraries(gazebo_ros_range ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES} $
 add_library(gazebo_ros_forcetorque src/gazebo_ros_forcetorque.cpp)
 target_link_libraries(gazebo_ros_forcetorque ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES})
 
-add_library(gazebo_ros_ir_receiver src/gazebo_ros_ir_receiver.cpp)
+add_library(gazebo_ros_ir_receiver src/gazebo_ros_ir_receiver.cpp src/ir_emitter.cpp)
 target_link_libraries(gazebo_ros_ir_receiver ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES})
 
 add_library(gazebo_pal_hand src/gazebo_pal_hand.cpp)

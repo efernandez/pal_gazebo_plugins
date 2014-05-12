@@ -42,6 +42,8 @@
 
 #include <tf/tf.h>
 
+#include "xmlrpc_helpers.h"
+
 namespace gazebo
 {
 GZ_REGISTER_SENSOR_PLUGIN(GazeboRosIRReceiver)
@@ -123,6 +125,34 @@ void GazeboRosIRReceiver::LoadThread()
   std::string prefix = "";
   nh_->param("tf_prefix", prefix, prefix);
   frame_name_ = tf::resolve(prefix, frame_name_);
+
+  // IR emitters
+  xh::Array output;
+  xh::fetchParam(*nh_, "ir_emitters", output);
+
+  xh::Struct output_i;
+  std::string name;
+  int code;
+  double angle, fov, range;
+  xh::Struct position;
+  double x, y, z;
+  for (int i = 0; i < output.size(); ++i)
+  {
+    xh::getArrayItem(output, i, output_i);
+
+    xh::getStructMember(output_i, "name", name);
+    xh::getStructMember(output_i, "code", code);
+    xh::getStructMember(output_i, "angle", angle);
+    xh::getStructMember(output_i, "fov", fov);
+    xh::getStructMember(output_i, "range", range);
+    xh::getStructMember(output_i, "position", position);
+    xh::getStructMember(position, "x", x);
+    xh::getStructMember(position, "y", y);
+    xh::getStructMember(position, "z", z);
+
+    ir_emitters_.emplace_back(name, code, angle, fov, range, x, y, z);
+    ROS_INFO_STREAM("Add IR emitter: " << ir_emitters_.back());
+  }
 
   pub_ = nh_->advertise<kobuki_msgs::DockInfraRed>(topic_name_, 10);
 
