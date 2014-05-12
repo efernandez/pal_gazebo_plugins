@@ -64,6 +64,7 @@ private:
   double z_;
 
   double range2_;
+  double fov2_;
 };
 
 std::ostream& operator<<(std::ostream& os, const IREmitter& v);

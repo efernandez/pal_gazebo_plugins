@@ -130,31 +130,39 @@ void GazeboRosIRReceiver::LoadThread()
   frame_name_ = tf::resolve(prefix, frame_name_);
 
   // IR emitters
-  xh::Array output;
-  xh::fetchParam(*nh_, "ir_emitters", output);
-
-  xh::Struct output_i;
-  std::string name;
-  int code;
-  double angle, fov, range;
-  xh::Struct position;
-  double x, y, z;
-  for (int i = 0; i < output.size(); ++i)
+  try
   {
-    xh::getArrayItem(output, i, output_i);
+    xh::Array output;
+    xh::fetchParam(*nh_, "ir_emitters", output);
 
-    xh::getStructMember(output_i, "name", name);
-    xh::getStructMember(output_i, "code", code);
-    xh::getStructMember(output_i, "angle", angle);
-    xh::getStructMember(output_i, "fov", fov);
-    xh::getStructMember(output_i, "range", range);
-    xh::getStructMember(output_i, "position", position);
-    xh::getStructMember(position, "x", x);
-    xh::getStructMember(position, "y", y);
-    xh::getStructMember(position, "z", z);
+    xh::Struct output_i;
+    std::string name;
+    int code;
+    double angle, fov, range;
+    xh::Struct position;
+    double x, y, z;
+    for (int i = 0; i < output.size(); ++i)
+    {
+      xh::getArrayItem(output, i, output_i);
 
-    ir_emitters_.emplace_back(name, code, angle, fov, range, x, y, z);
-    ROS_INFO_STREAM("Add IR emitter: " << ir_emitters_.back());
+      xh::getStructMember(output_i, "name", name);
+      xh::getStructMember(output_i, "code", code);
+      xh::getStructMember(output_i, "angle", angle);
+      xh::getStructMember(output_i, "fov", fov);
+      xh::getStructMember(output_i, "range", range);
+      xh::getStructMember(output_i, "position", position);
+      xh::getStructMember(position, "x", x);
+      xh::getStructMember(position, "y", y);
+      xh::getStructMember(position, "z", z);
+
+      ir_emitters_.emplace_back(name, code, angle, fov, range, x, y, z);
+      ROS_INFO_STREAM("Add IR emitter: " << ir_emitters_.back());
+    }
+  }
+  catch (const xh::XmlrpcHelperException& e)
+  {
+    ROS_INFO_STREAM("There is no IR emitter; "
+        "the IR receiver will not detect anything.");
   }
 
   pub_ = nh_->advertise<kobuki_msgs::DockInfraRed>(topic_name_, 10);
@@ -200,7 +208,11 @@ void GazeboRosIRReceiver::UpdateChild()
     foreach (auto ir_emitter, ir_emitters_)
     {
       if (ir_emitter.isInRange(x0, y0, z0))
-        msg.data.push_back(ir_emitter.getCode());
+      {
+        const int code = ir_emitter.getCode();
+        ROS_ERROR_STREAM("code " << code << " detected by " << frame_name_);
+        msg.data.push_back(code);
+      }
     }
 
     pub_.publish(msg);

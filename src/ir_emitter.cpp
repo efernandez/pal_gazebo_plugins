@@ -52,6 +52,7 @@ IREmitter::IREmitter(const std::string& name, int code, double angle, double fov
   , y_(y)
   , z_(z)
   , range2_(range_*range_)
+  , fov2_(fov_/2)
 {}
 
 double IREmitter::power(double x, double y, double z)
@@ -64,7 +65,7 @@ double IREmitter::power(double x, double y, double z)
 
   // @todo check if a in angle +- fov/2
   double da;
-  angles::shortest_angular_distance_with_limits(angle_, a, -fov_/2, fov_/2, da);
+  angles::shortest_angular_distance_with_limits(angle_, a, -fov2_, fov2_, da);
   ROS_ERROR_STREAM("a = " << a << "; da = " << da);
 
   if (d2 > range2_)
