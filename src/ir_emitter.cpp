@@ -36,6 +36,12 @@
 
 #include <pal_gazebo_plugins/ir_emitter.h>
 
+#include <angles/angles.h>
+
+#include <ros/ros.h> //@todo for debugging
+
+#include<cmath>
+
 IREmitter::IREmitter(const std::string& name, int code, double angle, double fov, double range, double x, double y, double z)
   : name_(name)
   , code_(code)
@@ -45,7 +51,36 @@ IREmitter::IREmitter(const std::string& name, int code, double angle, double fov
   , x_(x)
   , y_(y)
   , z_(z)
+  , range2_(range_*range_)
 {}
+
+double IREmitter::power(double x, double y, double z)
+{
+  const double dx = x - x_;
+  const double dy = y - y_;
+  const double d2 = dx*dx + dy*dy;
+
+  const double a = std::atan2(dy, dx);
+
+  // @todo check if a in angle +- fov/2
+  double da;
+  angles::shortest_angular_distance_with_limits(angle_, a, -fov_/2, fov_/2, da);
+  ROS_ERROR_STREAM("a = " << a << "; da = " << da);
+
+  if (d2 > range2_)
+    return 0.0;
+  else
+  {
+    // @todo we don't really need a function, but we could
+    // provide a linear one; for now just a constant value
+    return 1.0;
+  }
+}
+
+bool IREmitter::isInRange(double x, double y, double z)
+{
+  return power(x, y, z) > 0.0;
+}
 
 void IREmitter::print(std::ostream& os) const
 {

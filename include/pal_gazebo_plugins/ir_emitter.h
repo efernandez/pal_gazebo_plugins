@@ -45,12 +45,15 @@ class IREmitter
 public:
   IREmitter(const std::string& name, int code, double angle, double fov, double range, double x, double y, double z);
 
-  // @todo add method/s to check if the emitter is detected from a given position,
-  // i.e. if it's in range for a receiver
+  double power(double x, double y, double z);
+
+  bool isInRange(double x, double y, double z);
 
   void print(std::ostream& os) const;
 
-//private:
+  int getCode() const { return code_; }
+
+private:
   std::string name_;
   int code_;
   double angle_;
@@ -59,6 +62,8 @@ public:
   double x_;
   double y_;
   double z_;
+
+  double range2_;
 };
 
 std::ostream& operator<<(std::ostream& os, const IREmitter& v);

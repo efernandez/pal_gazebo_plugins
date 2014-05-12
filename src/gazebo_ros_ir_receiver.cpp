@@ -38,6 +38,9 @@
 
 #include <string>
 
+#include <boost/foreach.hpp>
+#define foreach BOOST_FOREACH
+
 #include <kobuki_msgs/DockInfraRed.h>
 
 #include <tf/tf.h>
@@ -182,15 +185,23 @@ void GazeboRosIRReceiver::UpdateChild()
     last_update_time_ = now;
 
     // @todo logic for the IRs
+
+    // @todo get robot position (look how to do it)
+    const double x0 = 0.0, y0 = 0.0, z0 = 0.0;
+
     kobuki_msgs::DockInfraRed msg;
     msg.header.frame_id = frame_name_;
     msg.header.stamp.sec = now.sec;
     msg.header.stamp.nsec = now.nsec;
 
     msg.data.clear();
-    msg.data.push_back(1);
-    msg.data.push_back(2);
-    msg.data.push_back(3);
+
+    // @todo foreach ir_emitters_ isInRange(x0, y0)
+    foreach (auto ir_emitter, ir_emitters_)
+    {
+      if (ir_emitter.isInRange(x0, y0, z0))
+        msg.data.push_back(ir_emitter.getCode());
+    }
 
     pub_.publish(msg);
   }
