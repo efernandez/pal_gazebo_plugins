@@ -34,6 +34,9 @@
 
 /** \author Enrique Fernandez */
 
+#include <gazebo/physics/physics.hh>
+#include <gazebo/gazebo.hh>
+
 #include <pal_gazebo_plugins/gazebo_ros_ir_receiver.h>
 
 #include <string>
@@ -103,6 +106,24 @@ void GazeboRosIRReceiver::Load(sensors::SensorPtr parent, sdf::ElementPtr sdf)
 
   update_period_ = update_rate_ > 0.0 ? 1.0/update_rate_ : 0.0;
 
+  range_min_ = 0.0;
+  if (!sdf->HasElement("minRange"))
+    ROS_WARN_STREAM("IR recevier sensor plugin missing <minRange>, defaults to " << range_min_);
+  else
+    range_min_ = sdf->GetElement("minRange")->Get<double>();
+
+  range_max_ = 100.0;
+  if (!sdf->HasElement("maxRange"))
+    ROS_WARN_STREAM("IR recevier sensor plugin missing <maxRange>, defaults to " << range_max_);
+  else
+    range_max_ = sdf->GetElement("maxRange")->Get<double>();
+
+  fov_ = M_PI;
+  if (!sdf->HasElement("fov"))
+    ROS_WARN_STREAM("IR recevier sensor plugin missing <fov>, defaults to " << fov_);
+  else
+    fov_ = sdf->GetElement("fov")->Get<double>();
+
   // Get sensor
   sensor_ = parent;
   if (!sensor_)
@@ -125,6 +146,30 @@ void GazeboRosIRReceiver::Load(sensors::SensorPtr parent, sdf::ElementPtr sdf)
     ROS_FATAL_STREAM("Couldn't find robot/parent entity " << robot_name);
     return;
   }
+
+  // ------------- @test
+  transport::PublisherPtr visPub;
+  msgs::Visual visualMsg;
+
+  transport::NodePtr node = transport::NodePtr(new transport::Node());
+  node->Init(world_name);
+  visPub = node->Advertise<msgs::Visual>("~/visual", 10);
+
+  visualMsg.set_name("__RED_CYLINDER_VISUAL__");
+
+  msgs::Geometry *geomMsg = visualMsg.mutable_geometry();
+  geomMsg->set_type(msgs::Geometry::CYLINDER);
+  geomMsg->mutable_cylinder()->set_radius(1);
+  geomMsg->mutable_cylinder()->set_length(.1);
+
+  //visualMsg.mutable_material()->set_script("Gazebo/RedGlow");
+
+  msgs::Set(visualMsg.mutable_pose(), math::Pose(0, 0, 0.6, 0, 0, 0));
+
+  visualMsg.set_cast_shadows(false);
+
+  visPub->Publish(visualMsg);
+  // -------------------
 
   deferred_load_thread_ = boost::thread(
     boost::bind(&GazeboRosIRReceiver::LoadThread, this));

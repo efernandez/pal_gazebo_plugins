@@ -93,6 +93,9 @@ private:
   std::string frame_name_;
   double      update_rate_;
   double      update_period_;
+  double range_min_;
+  double range_max_;
+  double fov_;
 
   /// \brief Pointer to the update event connections
   event::ConnectionPtr updateConnection;
