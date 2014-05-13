@@ -103,16 +103,16 @@ void GazeboRosIRReceiver::Load(sensors::SensorPtr parent, sdf::ElementPtr sdf)
 
   update_period_ = update_rate_ > 0.0 ? 1.0/update_rate_ : 0.0;
 
-  // Get the world name
-  const std::string world_name = parent->GetWorldName();
-  world_ = physics::get_world(world_name);
-
-  last_update_time_ = world_->GetSimTime();
-
   // Get sensor
   sensor_ = parent;
   if (!sensor_)
-    gzerr << "sensor not found\n" << "\n";
+    ROS_ERROR_STREAM("Sensor not found");
+
+  // Get the world name
+  const std::string world_name = sensor_->GetWorldName();
+  world_ = physics::get_world(world_name);
+
+  last_update_time_ = world_->GetSimTime();
 
   // Sensor relative pose wrt to its parent/robot
   sensor_pose_ = sensor_->GetPose();
@@ -142,6 +142,8 @@ void GazeboRosIRReceiver::LoadThread()
   frame_name_ = tf::resolve(prefix, frame_name_);
 
   // Load IR emitters
+  // @todo this shouldn't be called for every single instance,
+  // it should be called only once!!!
   try
   {
     xh::Array output;
