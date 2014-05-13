@@ -99,6 +99,7 @@ private:
 
   /// \brief Pointer to the sensor
   sensors::SensorPtr sensor_;
+  math::Pose         sensor_pose_;
   ros::Publisher pub_;
 
   boost::thread deferred_load_thread_;
@@ -107,6 +108,9 @@ private:
   ros::NodeHandle* nh_;
   ros::CallbackQueue ir_receiver_queue_;
   boost::thread callback_queue_thread_;
+
+  // Pointer to the robot
+  physics::EntityPtr robot_;
 
   // Pointer to the world
   physics::WorldPtr world_;

@@ -42,32 +42,29 @@
 
 #include<cmath>
 
-IREmitter::IREmitter(const std::string& name, int code, double angle, double fov, double range, double x, double y, double z)
+IREmitter::IREmitter(const std::string& name, double x, double y, double z, double yaw, int code, double fov, double range)
   : name_(name)
+  , pose_(x, y, z, 0.0, 0.0, yaw)
   , code_(code)
-  , angle_(angle)
   , fov_(fov)
   , range_(range)
-  , x_(x)
-  , y_(y)
-  , z_(z)
   , range2_(range_*range_)
   , fov2_(fov_/2)
 {}
 
-double IREmitter::power(double x, double y, double z)
+double IREmitter::power(const gazebo::math::Pose& pose)
 {
-  const double dx = x - x_;
-  const double dy = y - y_;
-  const double d2 = dx*dx + dy*dy;
+  const double d2 = (pose_.pos - pose.pos).GetSquaredLength();
 
-  const double a = std::atan2(dy, dx);
+  // @todo the pose orientation must be taken into account as weell!!!
+  //const double a = std::atan2(dy, dx);
 
   // @todo check if a in angle +- fov/2
-  double da;
-  angles::shortest_angular_distance_with_limits(angle_, a, -fov2_, fov2_, da);
-  ROS_ERROR_STREAM("a = " << a << "; da = " << da);
+  //double da;
+  //angles::shortest_angular_distance_with_limits(angle_, a, -fov2_, fov2_, da);
+  //ROS_ERROR_STREAM("a = " << a << "; da = " << da);
 
+  //ROS_ERROR_STREAM("d2 = " << d2 << "; range2 = " << range2_);
   if (d2 > range2_)
     return 0.0;
   else
@@ -78,19 +75,18 @@ double IREmitter::power(double x, double y, double z)
   }
 }
 
-bool IREmitter::isInRange(double x, double y, double z)
+bool IREmitter::isInRange(const gazebo::math::Pose& pose)
 {
-  return power(x, y, z) > 0.0;
+  return power(pose) > 0.0;
 }
 
 void IREmitter::print(std::ostream& os) const
 {
   os << "name: "  << name_  << "; "
+     << "pose: "  << pose_  << "; "
      << "code: "  << code_  << "; "
-     << "angle: " << angle_ << "; "
      << "fov: "   << fov_   << "; "
-     << "range: " << range_ << "; "
-     << "position: " << x_ << ", " << y_ << ", " << z_;
+     << "range: " << range_;
 }
 
 std::ostream& operator<<(std::ostream& os, const IREmitter& v)

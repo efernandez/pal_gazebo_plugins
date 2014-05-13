@@ -114,6 +114,18 @@ void GazeboRosIRReceiver::Load(sensors::SensorPtr parent, sdf::ElementPtr sdf)
   if (!sensor_)
     gzerr << "sensor not found\n" << "\n";
 
+  // Sensor relative pose wrt to its parent/robot
+  sensor_pose_ = sensor_->GetPose();
+
+  // Get parent/robot entity
+  std::string robot_name = sensor_->GetParentName();
+  robot_ = world_->GetEntity(robot_name);
+  if (robot_ == NULL)
+  {
+    ROS_FATAL_STREAM("Couldn't find robot/parent entity " << robot_name);
+    return;
+  }
+
   deferred_load_thread_ = boost::thread(
     boost::bind(&GazeboRosIRReceiver::LoadThread, this));
 }
@@ -129,7 +141,7 @@ void GazeboRosIRReceiver::LoadThread()
   nh_->param("tf_prefix", prefix, prefix);
   frame_name_ = tf::resolve(prefix, frame_name_);
 
-  // IR emitters
+  // Load IR emitters
   try
   {
     xh::Array output;
@@ -138,31 +150,31 @@ void GazeboRosIRReceiver::LoadThread()
     xh::Struct output_i;
     std::string name;
     int code;
-    double angle, fov, range;
-    xh::Struct position;
-    double x, y, z;
+    double fov, range;
+    xh::Struct pose;
+    double x, y, z, yaw;
     for (int i = 0; i < output.size(); ++i)
     {
       xh::getArrayItem(output, i, output_i);
 
       xh::getStructMember(output_i, "name", name);
       xh::getStructMember(output_i, "code", code);
-      xh::getStructMember(output_i, "angle", angle);
       xh::getStructMember(output_i, "fov", fov);
       xh::getStructMember(output_i, "range", range);
-      xh::getStructMember(output_i, "position", position);
-      xh::getStructMember(position, "x", x);
-      xh::getStructMember(position, "y", y);
-      xh::getStructMember(position, "z", z);
+      xh::getStructMember(output_i, "pose", pose);
+      xh::getStructMember(pose, "x", x);
+      xh::getStructMember(pose, "y", y);
+      xh::getStructMember(pose, "z", z);
+      xh::getStructMember(pose, "yaw", yaw);
 
-      ir_emitters_.emplace_back(name, code, angle, fov, range, x, y, z);
+      ir_emitters_.emplace_back(name, x, y, z, yaw, code, fov, range);
       ROS_INFO_STREAM("Add IR emitter: " << ir_emitters_.back());
     }
   }
   catch (const xh::XmlrpcHelperException& e)
   {
-    ROS_INFO_STREAM("There is no IR emitter; "
-        "the IR receiver will not detect anything.");
+    ROS_WARN_STREAM("There is no IR emitter; "
+        "the IR receivers will not detect anything.");
   }
 
   pub_ = nh_->advertise<kobuki_msgs::DockInfraRed>(topic_name_, 10);
@@ -189,13 +201,14 @@ void GazeboRosIRReceiver::UpdateChild()
   common::Time now = world_->GetSimTime();
   if (( now - last_update_time_) >= update_period_)
   {
-    ROS_ERROR_THROTTLE(10.0, "IR Receiver logic not implemented yet!");
     last_update_time_ = now;
 
-    // @todo logic for the IRs
+    // Get robot absolute pose wrt the world, and
+    // compute sensor pose wrt the world
+    math::Pose robot_pose  = robot_->GetWorldPose();
+    math::Pose sensor_pose = robot_pose * sensor_pose_;
+    ROS_ERROR_STREAM_THROTTLE(0.1, "Robot pose = " << robot_pose << "; Sensor pose = " << sensor_pose);
 
-    // @todo get robot position (look how to do it)
-    const double x0 = 0.0, y0 = 0.0, z0 = 0.0;
 
     kobuki_msgs::DockInfraRed msg;
     msg.header.frame_id = frame_name_;
@@ -204,13 +217,14 @@ void GazeboRosIRReceiver::UpdateChild()
 
     msg.data.clear();
 
-    // @todo foreach ir_emitters_ isInRange(x0, y0)
+    // Check which IR emitter are detected
     foreach (auto ir_emitter, ir_emitters_)
     {
-      if (ir_emitter.isInRange(x0, y0, z0))
+      //ROS_ERROR_STREAM("Checking " << ir_emitter.getName() << " for " << frame_name_);
+      if (ir_emitter.isInRange(sensor_pose))
       {
         const int code = ir_emitter.getCode();
-        ROS_ERROR_STREAM("code " << code << " detected by " << frame_name_);
+        //ROS_ERROR_STREAM("code " << code << " detected by " << frame_name_);
         msg.data.push_back(code);
       }
     }

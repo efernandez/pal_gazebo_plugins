@@ -37,31 +37,31 @@
 #ifndef IR_EMITTER_H
 #define IR_EMITTER_H
 
+#include <gazebo/math/Pose.hh>
+
 #include <string>
 #include <iostream>
 
 class IREmitter
 {
 public:
-  IREmitter(const std::string& name, int code, double angle, double fov, double range, double x, double y, double z);
+  IREmitter(const std::string& name, double x, double y, double z, double yaw, int code, double fov, double range);
 
-  double power(double x, double y, double z);
+  double power(const gazebo::math::Pose& pose);
 
-  bool isInRange(double x, double y, double z);
+  bool isInRange(const gazebo::math::Pose& pose);
 
   void print(std::ostream& os) const;
 
+  std::string getName() const { return name_; }
   int getCode() const { return code_; }
 
 private:
   std::string name_;
+  gazebo::math::Pose pose_;
   int code_;
-  double angle_;
   double fov_;
   double range_;
-  double x_;
-  double y_;
-  double z_;
 
   double range2_;
   double fov2_;
